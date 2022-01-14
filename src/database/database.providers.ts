@@ -12,10 +12,16 @@ export const databaseProviders = [
         password: process.env.TYPEORM_PASSWORD,
         database: process.env.TYPEORM_DATABASE,
         entities: [__dirname + '/../**/*.entity{.ts,.js}'],
-        migrations: [process.env.TYPEORM_MIGRATIONS],
+        migrations: [__dirname + '/../**/migrations/*{.ts,.js}'],
         cli: {
           migrationsDir: process.env.TYPEORM_MIGRATIONS_DIR,
           entitiesDir: process.env.TYPEORM_ENTITIES_DIR,
+        },
+        ssl: true,
+        extra: {
+          ssl: {
+            rejectUnauthorized: false,
+          },
         },
       }),
   },
