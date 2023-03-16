@@ -1,49 +1,58 @@
-# Node.js
-# Build a general Node.js project with npm.
-# Add steps that analyze code, save build artifacts, deploy, and more:
-# https://docs.microsoft.com/azure/devops/pipelines/languages/javascript
+name: Build and deploy Node.js app to Azure Web App - sampleapp
 
-trigger:
-- main
+    on:
+    push:
+        branches:
+        - main
+    workflow_dispatch:
 
-pool:
-  vmImage: 'ubuntu-latest'
+    jobs:
+    build:
+        runs-on: ubuntu-latest
 
-steps:
-- task: NodeTool@0
-  inputs:
-    versionSpec: '10.x'
-  displayName: 'Install Node.js'
+        steps:
+        - uses: actions/checkout@v2
 
-- script: |
-    npm ci
-    npm run build
-  displayName: 'npm install and build'
+        - name: Set up Node.js version
+            uses: actions/setup-node@v1
+            with:
+            node-version: '16.x'
 
-- script: |
-    npm run test-juint
-  displayName: 'npm test'
+        - name: npm install, build, and test
+            run: |
+            npm install
+            npm run build --if-present
 
+        - name: Zip all files for upload between jobs
+            run: zip --symlinks -r nest.zip ./*
+                
+        - name: Upload artifact for deployment job
+            uses: actions/upload-artifact@v2
+            with:
+            name: node-app
+            path: nest.zip
 
+    deploy:
+        runs-on: ubuntu-latest
+        needs: build
+        environment:
+        name: 'Production'
+        url: $
 
-- task: PublishTestResults@2
-  condition: succeededOrFailed()
-  inputs:
-    testResultsFormat: 'JUnit'
-    testResultsFiles: '**/test-results.xml'
+        steps:
+        - name: Download artifact from build job
+            uses: actions/download-artifact@v2
+            with:
+            name: node-app
 
-- task: CopyFiles@2
-  inputs:
-    SourceFolder: '$(Build.SourcesDirectory)'
-    Contents: |
-      **/*
-      !.git/**/*
-      !node_modules/**/*
-    TargetFolder: '$(Build.ArtifactStagingDirectory)'
-    CleanTargetFolder: true
+        - name: 'Deploy to Azure Web App'
+            id: deploy-to-webapp
+            uses: azure/webapps-deploy@v2
+            with:
+            app-name: 'sampleapp'
+            slot-name: 'Production'
+            publish-profile: $
+            package: nest.zip
 
-- task: PublishBuildArtifacts@1
-  inputs:
-    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-    ArtifactName: 'nestjs-zeebe'
-    publishLocation: 'Container'
+        - name: Delete zip file
+            run: rm nest.zip
